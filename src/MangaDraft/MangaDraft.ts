@@ -87,7 +87,7 @@ export class MangaDraft implements MangaProviding, ChapterProviding, SearchResul
     return App.createChapterDetails({
       id: chapterId,
       mangaId: mangaId,
-      pages: pages.filter(v => v.cat == chapterNum).map(v => v.url)
+      pages: pages.filter(v => v.cat == chapterNum).map(v => v.url + "?size=full&u=0")
     })
   }
 
