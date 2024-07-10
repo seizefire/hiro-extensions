@@ -757,7 +757,7 @@ var _Sources = (() => {
       if (!isNSFW && genre.name.includes("XXX")) {
         isNSFW = true;
       }
-      tags.push(App.createTag({ id: genre.id.toString(), label: genre.name }));
+      tags.push(App.createTag({ id: genre.slug, label: genre.name }));
     }
     const tagSection = App.createTagSection({ id: "genre", label: "Genres", tags });
     return [tagSection, isNSFW];
@@ -888,7 +888,7 @@ var _Sources = (() => {
         data = validateJSONResponse(response, `Retrieving search results - getSearchResults`);
       } else if (query.includedTags.length != 0) {
         let tag = query.includedTags[0];
-        let response = await sendGetRequest(`${BASE_DOMAIN}/api/catalog/projects?number=16&page=0&order=views&genre=${tag}`, this.requestManager, `${BASE_DOMAIN}/catalog/comics/all`);
+        let response = await sendGetRequest(`${BASE_DOMAIN}/api/catalog/projects?number=16&page=0&order=views&genre=${tag.id}`, this.requestManager, `${BASE_DOMAIN}/catalog/comics/all`);
         data = validateJSONResponse(response, `Retrieving search results - getSearchResults`);
       } else {
         throw new Error(`Unsupported search request: ${JSON.stringify(query)}`);
