@@ -1,0 +1,1 @@
+{"buildTime":"2024-07-10T15:21:09.544Z","sources":[{"id":"MangaDraft","name":"MangaDraft","author":"Seize","desc":"Extension that pulls manga from MangaDraft.","website":"http://github.com/seizefire","contentRating":"EVERYONE","version":"0.0.1","icon":"icon.png","tags":[],"websiteBaseURL":"https://mangadraft.com","intents":5}],"builtWith":{"toolchain":"0.8.7","types":"0.8.7"}}
