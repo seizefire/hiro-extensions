@@ -4,25 +4,16 @@ type MDChapter = {id: number, name: string, published_at: string}
 type MDTome = {id: number}
 type MDGenre = {id: number, name: string}
 
-export const LanguageCodes = [
-  undefined, "en", undefined, "fr", "it", "es", "de", "pl",
-  "pt", "fi", "jp"
-]
+export type ListPagesResponse = {
+  data: {cat: number, url: string}[]
+}
 
-export const LanguageNames = [
-  undefined, "English", undefined, "French", "Italian", "Spanish", "German", "Polish",
-  "Portuguese", "Finnish", "Japanese"
-]
+export type HomePageResponse = {
+  data: {title: string, avatar: string, slug: string, type: string, subtitle: string}[]
+}
 
-export const ProjectStatuses = [
-  "Ongoing", "Completed", "On Hiatus"
-]
-
-export type MangaSearchResult = {
-  name: string,
-  avatar: string,
-  slug: string,
-  type: string
+export type TitleSearchResponse = {
+  data: {name: string, avatar: string, slug: string, type: string}[]
 }
 
 export type ProjectData = {
@@ -49,3 +40,17 @@ export type ProjectData = {
     TOME: MDTome[]
   }
 }
+
+export const LanguageCodes = [
+  undefined, "en", undefined, "fr", "it", "es", "de", "pl",
+  "pt", "fi", "jp"
+]
+
+export const LanguageNames = [
+  undefined, "English", undefined, "French", "Italian", "Spanish", "German", "Polish",
+  "Portuguese", "Finnish", "Japanese"
+]
+
+export const ProjectStatuses = [
+  "Ongoing", "Completed", "On Hiatus"
+]

@@ -1,10 +1,12 @@
-import { Chapter, ChapterDetails, ChapterProviding, ContentRating, HomePageSectionsProviding, HomeSection, HomeSectionType, MangaProviding, PagedResults, PartialSourceManga, RequestManager, SearchField, SearchRequest, SearchResultsProviding, SourceInfo, SourceIntents, SourceManga, Tag, TagSection } from "@paperback/types";
-import { LanguageCodes, MangaSearchResult, ProjectData, ProjectStatuses } from "./Types";
+import { Chapter, ChapterDetails, ChapterProviding, ContentRating, HomePageSectionsProviding, HomeSection, HomeSectionType, MangaProviding, PagedResults, PartialSourceManga, SearchRequest, SearchResultsProviding, SourceInfo, SourceIntents, SourceManga } from "@paperback/types";
+import { HomePageResponse, LanguageCodes, ListPagesResponse, ProjectData, ProjectStatuses, TitleSearchResponse } from "./Types";
+
+import * as MD from "./Utils";
 
 const BASE_DOMAIN = "https://mangadraft.com";
 
 export const MangaDraftInfo: SourceInfo = {
-  version: '0.0.1',
+  version: '1.0.0',
   name: 'MangaDraft',
   description: 'Extension that pulls manga from MangaDraft.',
   author: 'Seize',
@@ -17,14 +19,13 @@ export const MangaDraftInfo: SourceInfo = {
 }
 
 export class MangaDraft implements MangaProviding, ChapterProviding, SearchResultsProviding, HomePageSectionsProviding {
-  numRetries = 5
   requestManager = App.createRequestManager({requestsPerSecond: 5})
 
   constructor(public cheerio: cheerio.CheerioAPI) {}
 
   async getChapters(mangaId: string): Promise<Chapter[]> {
     // load the project data
-    const projectData = await this.loadSummaryData(mangaId);
+    const projectData = await this.loadSummaryData(mangaId, "getChapters");
     // create a list of chapters
     var chapters: Chapter[] = [];
     // iterate over each tome (volume)
@@ -52,60 +53,29 @@ export class MangaDraft implements MangaProviding, ChapterProviding, SearchResul
   async getChapterDetails(mangaId: string, chapterId: string): Promise<ChapterDetails> {
     // make the request
     const readerUrl = `${BASE_DOMAIN}/reader/${mangaId}/c.${chapterId}`;
-    const readerRequest = App.createRequest({
-      url: readerUrl,
-      method: 'GET',
-      headers: {
-        'Referer': readerUrl,
-        'User-Agent': await this.requestManager.getDefaultUserAgent()
-      }
-    });
-    // get the response
-    const readerResponse = await this.requestManager.schedule(readerRequest, this.numRetries);
+    const readerResponse = await MD.sendGetRequest(readerUrl, this.requestManager);
+    // validate the response
+    const readerBody = MD.validateResponse(readerResponse, `Loading reader page of mid "${mangaId}" cid "${chapterId}" - getChapterDetails`);
     // find the project data
-    const projectDataString = readerResponse.data!.match(/(?<=window\.project_data ?= ?){[^;]+/);
-    if(projectDataString === null){
-      throw new Error(`Unable to find "project_data" object in body`);
-    }
-    const projectData: ProjectData = JSON.parse(projectDataString[0]);
-    const firstId = projectData.first_page.id;
+    const projectData = MD.extractProjectData(readerBody, `Loading reader page of mid "${mangaId}" cid "${chapterId}" - getChapterDetails`);
     // load more pages
-    const pagesUrl = `${BASE_DOMAIN}/api/reader/listPages?first_page=${firstId}`;
-    const pagesRequest = App.createRequest({
-      url: pagesUrl,
-      method: "GET",
-      headers: {
-        'Referer': readerUrl,
-        'User-Agent': await this.requestManager.getDefaultUserAgent()
-      }
-    });
-    const pagesResponse = await this.requestManager.schedule(pagesRequest, this.numRetries);
-    const pages: any[] = JSON.parse(pagesResponse.data!).data;
-    // get the raw pages
+    const pagesResponse = await MD.sendGetRequest(`${BASE_DOMAIN}/api/reader/listPages?first_page=${projectData.first_page.id}`, this.requestManager, readerUrl);
+    const pages: ListPagesResponse = MD.validateJSONResponse(pagesResponse, `Loading extra pages for mid "${mangaId}" cid "${chapterId}" - getChapterDetails`);
+    // we need the chapter ID as an int
     const chapterNum = parseInt(chapterId);
     // return the details
     return App.createChapterDetails({
       id: chapterId,
       mangaId: mangaId,
-      pages: pages.filter(v => v.cat == chapterNum).map(v => v.url + "?size=full&u=0")
+      pages: pages.data.filter(v => v.cat == chapterNum).map(v => v.url + "?size=full&u=0")
     })
   }
 
   async getMangaDetails(mangaId: string): Promise<SourceManga> {
     // get the project data
-    const projectData = await this.loadSummaryData(mangaId);
-    // create list of tags
-    var isHentai = false;
-    var tagSection = App.createTagSection({
-      id: '0',
-      label: "Genres",
-      tags: projectData.project.genres.map(v => {
-        if(!isHentai && v.name.includes("XXX")){
-          isHentai = true;
-        }
-        return App.createTag({id: v.id.toString(), label: v.name});
-      })
-    })
+    const projectData = await this.loadSummaryData(mangaId, "getMangaDetails");
+    // get tag section and NSFW rating
+    var [tagSection, isNSFW] = MD.createProjectTagSection(projectData);
     // return the manga details
     return App.createSourceManga({
       id: mangaId,
@@ -115,7 +85,7 @@ export class MangaDraft implements MangaProviding, ChapterProviding, SearchResul
         author: projectData.project.user.name,
         desc: projectData.project.description,
         status: ProjectStatuses[projectData.project.project_status_id]!,
-        hentai: isHentai,
+        hentai: isNSFW,
         titles: [projectData.project.name],
         tags: [tagSection],
         banner: projectData.project.background
@@ -127,30 +97,32 @@ export class MangaDraft implements MangaProviding, ChapterProviding, SearchResul
     return `${BASE_DOMAIN}/manga/${mangaId}`;
   }
   
-  async getSearchResults(query: SearchRequest, metadata: unknown | undefined): Promise<PagedResults> {
-    // make the request
-    const url = `${BASE_DOMAIN}/api/search/autocomplete?value=${encodeURIComponent(query.title || (query as any).query || "")}`;
-    const request = App.createRequest({
-      url: url,
-      method: 'GET',
-      headers: {
-        'Referer': BASE_DOMAIN,
-        'User-Agent': await this.requestManager.getDefaultUserAgent()
-      }
-    });
-    // get the response
-    const response = await this.requestManager.schedule(request, this.numRetries);
-    if(response.status != 200){
-      throw new Error(`Failed to retrieve search results`);
+  async getSearchResults(query: SearchRequest, _metadata: unknown | undefined): Promise<PagedResults> {
+    var data: TitleSearchResponse;
+    // unfortunately, we cannot search with query and tags together
+    if(query.title){
+      // make the request and validate
+      let response = await MD.sendGetRequest(`${BASE_DOMAIN}/api/search/autocomplete?value=${encodeURIComponent(query.title)}`, this.requestManager, BASE_DOMAIN);
+      data = MD.validateJSONResponse(response, `Retrieving search results - getSearchResults`);
     }
-    // get the results
-    var data: MangaSearchResult[] = JSON.parse(response.data!).data;
-    data = data.filter(v => v.type == "comics");
+    // ... and we can only use one normal tag at a time
+    else if(query.includedTags.length != 0){
+      let tag = query.includedTags[0];
+      // make the request
+      let response = await MD.sendGetRequest(`${BASE_DOMAIN}/api/catalog/projects?number=16&page=0&order=views&genre=${tag}`, this.requestManager, `${BASE_DOMAIN}/catalog/comics/all`);
+      data = MD.validateJSONResponse(response, `Retrieving search results - getSearchResults`);
+    }
+    // unsupported search requests
+    else {
+      throw new Error(`Unsupported search request: ${JSON.stringify(query)}`);
+    }
+    // filter the results
+    data.data = data.data.filter(v => v.type == "comics");
     // create the manga list
-    const mangas: PartialSourceManga[] = data.map(v => App.createPartialSourceManga({
-      mangaId: v.slug,
-      image: v.avatar,
-      title: v.name
+    const mangas: PartialSourceManga[] = data.data.map(result => App.createPartialSourceManga({
+      mangaId: result.slug,
+      image: result.avatar,
+      title: result.name
     }));
     // return the paged results
     return App.createPagedResults({results: mangas});
@@ -158,38 +130,23 @@ export class MangaDraft implements MangaProviding, ChapterProviding, SearchResul
 
   async getHomePageSections(sectionCallback: (section: HomeSection) => void): Promise<void> {
     sectionCallback(await this.loadSection("Trending", "order=trending&number=12&thumbnail=true&section=indepolis", HomeSectionType.featured));
-    sectionCallback(await this.loadSection("Indepolis", "order=news&number=12&thumbnail=true&section=indepolis", HomeSectionType.singleRowLarge));
-    sectionCallback(await this.loadSection("Neoville", "order=news&number=12&thumbnail=true&section=neoville", HomeSectionType.singleRowLarge));
+    sectionCallback(await this.loadSection("Indepolis", "order=news&number=12&thumbnail=true&section=indepolis", HomeSectionType.singleRowNormal));
+    sectionCallback(await this.loadSection("Neoville", "order=news&number=12&thumbnail=true&section=neoville", HomeSectionType.singleRowNormal));
   }
 
-  async getViewMoreItems(homepageSectionId: string, metadata: any): Promise<PagedResults> {
+  async getViewMoreItems(_homepageSectionId: string, _metadata: any): Promise<PagedResults> {
     return App.createPagedResults({results: []});
   }
 
   private async loadSection(name: string, query: string, type: HomeSectionType): Promise<HomeSection> {
-    // make the request
-    const url = `${BASE_DOMAIN}/api/catalog/projects?${query}`;
-    const request = App.createRequest({
-      url: url,
-      method: 'GET',
-      headers: {
-        'Referer': BASE_DOMAIN,
-        'User-Agent': await this.requestManager.getDefaultUserAgent()
-      }
-    });
-    // get the response
-    const response = await this.requestManager.schedule(request, this.numRetries);
-    if(response.status != 200){
-      throw new Error(`Failed to retrieve home page section ${name}`);
-    }
-    // get the results
-    const data: any[] = JSON.parse(response.data!).data;
+    const response = await MD.sendGetRequest(`${BASE_DOMAIN}/api/catalog/projects?${query}`, this.requestManager, BASE_DOMAIN);
+    const data: HomePageResponse = MD.validateJSONResponse(response, `Retrieving ${name} section - getHomePageSections`);
     // return the section
     return App.createHomeSection({
       id: name,
       title: name,
       type: type,
-      items: data.map(v => App.createPartialSourceManga({
+      items: data.data.map(v => App.createPartialSourceManga({
         mangaId: v.slug,
         image: v.avatar,
         title: v.title,
@@ -202,30 +159,15 @@ export class MangaDraft implements MangaProviding, ChapterProviding, SearchResul
   /**
    * Loads the project data from a manga's summary page
    * @param mangaId The manga's ID
+   * @param parentFunction The name of the parent function (for use in error messages)
    * @returns The project data
    */
-  private async loadSummaryData(mangaId: string): Promise<ProjectData> {
+  private async loadSummaryData(mangaId: string, parentFunction: string): Promise<ProjectData> {
     // make the request
-    const url = `${BASE_DOMAIN}/manga/${mangaId}/summary`;
-    const request = App.createRequest({
-      url: url,
-      method: 'GET',
-      headers: {
-        'Referer': url,
-        'User-Agent': await this.requestManager.getDefaultUserAgent()
-      }
-    });
-    // did we find the manga
-    const response = await this.requestManager.schedule(request, this.numRetries);
-    if(response.status === 404){
-      throw new Error(`Manga "${mangaId}" does not exist`);
-    }
+    const request = await MD.sendGetRequest(`${BASE_DOMAIN}/manga/${mangaId}/summary`, this.requestManager);
+    // check for errors
+    const data = MD.validateResponse(request, `Loading summary page of id "${mangaId}" - ${parentFunction}`);
     // find the project data
-    const projectDataString = response.data!.match(/(?<=window\.project_data ?= ?){[^;]+/);
-    if(projectDataString === null){
-      throw new Error(`Unable to find "project_data" object in body`);
-    }
-    // return the project data
-    return JSON.parse(projectDataString[0]);
+    return MD.extractProjectData(data, `Loading summary page of id "${mangaId}" - ${parentFunction}`);
   }
 }
