@@ -15,7 +15,7 @@ export function createProjectTagSection(project: ProjectData): [TagSection, bool
     if(!isNSFW && genre.name.includes("XXX")){
       isNSFW = true;
     }
-    tags.push(App.createTag({id: genre.id.toString(), label: genre.name}));
+    tags.push(App.createTag({id: genre.slug, label: genre.name}));
   }
   // create the tag section
   const tagSection = App.createTagSection({id: "genre", label: "Genres", tags});

@@ -107,9 +107,9 @@ export class MangaDraft implements MangaProviding, ChapterProviding, SearchResul
     }
     // ... and we can only use one normal tag at a time
     else if(query.includedTags.length != 0){
-      let tag = query.includedTags[0];
+      let tag = query.includedTags[0]!;
       // make the request
-      let response = await MD.sendGetRequest(`${BASE_DOMAIN}/api/catalog/projects?number=16&page=0&order=views&genre=${tag}`, this.requestManager, `${BASE_DOMAIN}/catalog/comics/all`);
+      let response = await MD.sendGetRequest(`${BASE_DOMAIN}/api/catalog/projects?number=16&page=0&order=views&genre=${tag.id}`, this.requestManager, `${BASE_DOMAIN}/catalog/comics/all`);
       data = MD.validateJSONResponse(response, `Retrieving search results - getSearchResults`);
     }
     // unsupported search requests

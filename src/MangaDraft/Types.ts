@@ -2,7 +2,7 @@
 
 type MDChapter = {id: number, name: string, published_at: string}
 type MDTome = {id: number}
-type MDGenre = {id: number, name: string}
+type MDGenre = {id: number, slug: string, name: string}
 
 export type ListPagesResponse = {
   data: {cat: number, url: string}[]
