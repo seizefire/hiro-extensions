@@ -821,7 +821,7 @@ var _Sources = (() => {
       return App.createChapterDetails({
         id: chapterId,
         mangaId,
-        pages: pages.filter((v) => v.cat == chapterNum).map((v) => v.url)
+        pages: pages.filter((v) => v.cat == chapterNum).map((v) => v.url + "?size=full&u=0")
       });
     }
     async getMangaDetails(mangaId) {
