@@ -763,20 +763,14 @@ var _Sources = (() => {
     return [tagSection, isNSFW];
   }
   function extractProjectData(body, purpose) {
-    var jsonStart = body.indexOf("window.project_data");
-    if (jsonStart == -1) throw new Error(`"window.project_data" not present in body - Please report if you see this [${purpose}]`);
-    body = body.substring(jsonStart);
-    jsonStart = body.indexOf("=") + 1;
-    if (jsonStart == 0) throw new Error(`"window.project_data" found but not assigned - Please report if you see this [${purpose}]`);
-    body = body.substring(jsonStart);
+    const projectDataString = body.match(/(?<=window\.project_data ?= ?){[^\n]+(?=;)/);
+    if (projectDataString === null) {
+      throw new Error(`Could not find "project_data" definition in page body [${purpose}]`);
+    }
     try {
-      JSON.parse(body);
-      throw new Error(`First pass of JSON.parse succeeded >:( - Please report if you see this [${purpose}]`);
+      return JSON.parse(projectDataString[0]);
     } catch (err) {
-      let posStart = err.message.indexOf(" at position ") + 13;
-      let posEnd = err.message.indexOf(" ", posStart);
-      let pos = parseInt(err.message.substring(posStart, posEnd));
-      return JSON.parse(body.substring(0, pos));
+      throw new Error(`Body of "project_data" is not valid JSON - Please report if you see this [${purpose}]`);
     }
   }
   async function sendGetRequest(url, requestManager, referer = url) {
