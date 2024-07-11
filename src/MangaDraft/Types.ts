@@ -3,6 +3,7 @@
 type MDChapter = {id: number, name: string, published_at: string}
 type MDTome = {id: number}
 type MDGenre = {id: number, slug: string, name: string}
+type MDRoot = {id: number}
 
 export type ListPagesResponse = {
   data: {cat: number, url: string}[]
@@ -37,6 +38,7 @@ export type ProjectData = {
   }
   summary: {
     CHAPTER: {[x: number]: MDChapter[]},
+    ROOT: MDRoot[]
     TOME: MDTome[]
   }
 }

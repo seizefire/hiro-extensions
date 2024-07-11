@@ -6,7 +6,7 @@ import * as MD from "./Utils";
 const BASE_DOMAIN = "https://mangadraft.com";
 
 export const MangaDraftInfo: SourceInfo = {
-  version: '1.0.0',
+  version: '1.0.1',
   name: 'MangaDraft',
   description: 'Extension that pulls manga from MangaDraft.',
   author: 'Seize',
@@ -28,18 +28,37 @@ export class MangaDraft implements MangaProviding, ChapterProviding, SearchResul
     const projectData = await this.loadSummaryData(mangaId, "getChapters");
     // create a list of chapters
     var chapters: Chapter[] = [];
-    // iterate over each tome (volume)
-    for(let i = 0; i < projectData.summary.TOME.length; ++i){
-      let tome = projectData.summary.TOME[i]!;
-      let tomeChapters = projectData.summary.CHAPTER[tome.id]!;
-      // iterate over each chapter in the tome
-      for(let j = 0; j < tomeChapters.length; ++j){
-        let chapter = tomeChapters[j]!;
+    // is the project split into volumes?
+    if(projectData.summary.TOME.length != 0){
+      // iterate over each tome (volume)
+      for(let i = 0; i < projectData.summary.TOME.length; ++i){
+        let tome = projectData.summary.TOME[i]!;
+        let tomeChapters = projectData.summary.CHAPTER[tome.id]!;
+        // iterate over each chapter in the tome
+        for(let j = 0; j < tomeChapters.length; ++j){
+          let chapter = tomeChapters[j]!;
+          // add a chapter object
+          chapters.push(App.createChapter({
+            id: chapter.id.toString(),
+            chapNum: chapters.length + 1,
+            volume: i + 1,
+            name: chapter.name,
+            time: new Date(chapter.published_at),
+            langCode: LanguageCodes[projectData.project.language]
+          }));
+        }
+      }
+    }
+    // is the project not split into volumes
+    else if(projectData.summary.ROOT.length != 0){
+      let rootChapters = projectData.summary.CHAPTER[projectData.summary.ROOT[0]!.id]!;
+      // iterate over each chapter
+      for(let i = 0; i < rootChapters.length; ++i){
+        let chapter = rootChapters[i]!;
         // add a chapter object
         chapters.push(App.createChapter({
           id: chapter.id.toString(),
           chapNum: chapters.length + 1,
-          volume: i + 1,
           name: chapter.name,
           time: new Date(chapter.published_at),
           langCode: LanguageCodes[projectData.project.language]
