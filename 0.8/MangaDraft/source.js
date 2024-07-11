@@ -810,7 +810,7 @@ var _Sources = (() => {
   // src/MangaDraft/MangaDraft.ts
   var BASE_DOMAIN = "https://mangadraft.com";
   var MangaDraftInfo = {
-    version: "1.0.0",
+    version: "1.0.1",
     name: "MangaDraft",
     description: "Extension that pulls manga from MangaDraft.",
     author: "Seize",
@@ -829,15 +829,29 @@ var _Sources = (() => {
     async getChapters(mangaId) {
       const projectData = await this.loadSummaryData(mangaId, "getChapters");
       var chapters = [];
-      for (let i = 0; i < projectData.summary.TOME.length; ++i) {
-        let tome = projectData.summary.TOME[i];
-        let tomeChapters = projectData.summary.CHAPTER[tome.id];
-        for (let j = 0; j < tomeChapters.length; ++j) {
-          let chapter = tomeChapters[j];
+      if (projectData.summary.TOME.length != 0) {
+        for (let i = 0; i < projectData.summary.TOME.length; ++i) {
+          let tome = projectData.summary.TOME[i];
+          let tomeChapters = projectData.summary.CHAPTER[tome.id];
+          for (let j = 0; j < tomeChapters.length; ++j) {
+            let chapter = tomeChapters[j];
+            chapters.push(App.createChapter({
+              id: chapter.id.toString(),
+              chapNum: chapters.length + 1,
+              volume: i + 1,
+              name: chapter.name,
+              time: new Date(chapter.published_at),
+              langCode: LanguageCodes[projectData.project.language]
+            }));
+          }
+        }
+      } else if (projectData.summary.ROOT.length != 0) {
+        let rootChapters = projectData.summary.CHAPTER[projectData.summary.ROOT[0].id];
+        for (let i = 0; i < rootChapters.length; ++i) {
+          let chapter = rootChapters[i];
           chapters.push(App.createChapter({
             id: chapter.id.toString(),
             chapNum: chapters.length + 1,
-            volume: i + 1,
             name: chapter.name,
             time: new Date(chapter.published_at),
             langCode: LanguageCodes[projectData.project.language]
