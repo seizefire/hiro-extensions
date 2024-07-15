@@ -1,12 +1,11 @@
-import { Chapter, ChapterDetails, ChapterProviding, ContentRating, HomePageSectionsProviding, HomeSection, HomeSectionType, MangaProviding, PagedResults, PartialSourceManga, SearchRequest, SearchResultsProviding, SourceInfo, SourceIntents, SourceManga } from "@paperback/types";
+import { BadgeColor, Chapter, ChapterDetails, ChapterProviding, ContentRating, HomePageSectionsProviding, HomeSection, HomeSectionType, MangaProviding, PagedResults, PartialSourceManga, SearchRequest, SearchResultsProviding, SourceInfo, SourceIntents, SourceManga, Tag, TagSection } from "@paperback/types";
 import { HomePageResponse, LanguageCodes, ListPagesResponse, ProjectData, ProjectStatuses, TitleSearchResponse } from "./Types";
-
-import * as MD from "./Utils";
+import { sendGetRequest, validateResponse, validateJSONResponse } from "../Utils";
 
 const BASE_DOMAIN = "https://mangadraft.com";
 
 export const MangaDraftInfo: SourceInfo = {
-  version: '1.0.1',
+  version: '1.0.2',
   name: 'MangaDraft',
   description: 'Extension that pulls manga from MangaDraft.',
   author: 'Seize',
@@ -14,7 +13,12 @@ export const MangaDraftInfo: SourceInfo = {
   icon: 'icon.png',
   contentRating: ContentRating.EVERYONE,
   websiteBaseURL: BASE_DOMAIN,
-  sourceTags: [],
+  sourceTags: [
+    {
+      text: "French",
+      type: BadgeColor.GREY
+    }
+  ],
   intents: SourceIntents.MANGA_CHAPTERS | SourceIntents.HOMEPAGE_SECTIONS
 }
 
@@ -72,14 +76,14 @@ export class MangaDraft implements MangaProviding, ChapterProviding, SearchResul
   async getChapterDetails(mangaId: string, chapterId: string): Promise<ChapterDetails> {
     // make the request
     const readerUrl = `${BASE_DOMAIN}/reader/${mangaId}/c.${chapterId}`;
-    const readerResponse = await MD.sendGetRequest(readerUrl, this.requestManager);
+    const readerResponse = await sendGetRequest(readerUrl, this.requestManager);
     // validate the response
-    const readerBody = MD.validateResponse(readerResponse, `Loading reader page of mid "${mangaId}" cid "${chapterId}" - getChapterDetails`);
+    const readerBody = validateResponse(readerResponse, `Loading reader page of mid "${mangaId}" cid "${chapterId}" - getChapterDetails`);
     // find the project data
-    const projectData = MD.extractProjectData(readerBody, `Loading reader page of mid "${mangaId}" cid "${chapterId}" - getChapterDetails`);
+    const projectData = extractProjectData(readerBody, `Loading reader page of mid "${mangaId}" cid "${chapterId}" - getChapterDetails`);
     // load more pages
-    const pagesResponse = await MD.sendGetRequest(`${BASE_DOMAIN}/api/reader/listPages?first_page=${projectData.first_page.id}`, this.requestManager, readerUrl);
-    const pages: ListPagesResponse = MD.validateJSONResponse(pagesResponse, `Loading extra pages for mid "${mangaId}" cid "${chapterId}" - getChapterDetails`);
+    const pagesResponse = await sendGetRequest(`${BASE_DOMAIN}/api/reader/listPages?first_page=${projectData.first_page.id}`, this.requestManager, readerUrl);
+    const pages: ListPagesResponse = validateJSONResponse(pagesResponse, `Loading extra pages for mid "${mangaId}" cid "${chapterId}" - getChapterDetails`);
     // we need the chapter ID as an int
     const chapterNum = parseInt(chapterId);
     // return the details
@@ -94,7 +98,7 @@ export class MangaDraft implements MangaProviding, ChapterProviding, SearchResul
     // get the project data
     const projectData = await this.loadSummaryData(mangaId, "getMangaDetails");
     // get tag section and NSFW rating
-    var [tagSection, isNSFW] = MD.createProjectTagSection(projectData);
+    var [tagSection, isNSFW] = createProjectTagSection(projectData);
     // return the manga details
     return App.createSourceManga({
       id: mangaId,
@@ -121,15 +125,15 @@ export class MangaDraft implements MangaProviding, ChapterProviding, SearchResul
     // unfortunately, we cannot search with query and tags together
     if(query.title){
       // make the request and validate
-      let response = await MD.sendGetRequest(`${BASE_DOMAIN}/api/search/autocomplete?value=${encodeURIComponent(query.title)}`, this.requestManager, BASE_DOMAIN);
-      data = MD.validateJSONResponse(response, `Retrieving search results - getSearchResults`);
+      let response = await sendGetRequest(`${BASE_DOMAIN}/api/search/autocomplete?value=${encodeURIComponent(query.title)}`, this.requestManager, BASE_DOMAIN);
+      data = validateJSONResponse(response, `Retrieving search results - getSearchResults`);
     }
     // ... and we can only use one normal tag at a time
     else if(query.includedTags.length != 0){
       let tag = query.includedTags[0]!;
       // make the request
-      let response = await MD.sendGetRequest(`${BASE_DOMAIN}/api/catalog/projects?number=16&page=0&order=views&genre=${tag.id}`, this.requestManager, `${BASE_DOMAIN}/catalog/comics/all`);
-      data = MD.validateJSONResponse(response, `Retrieving search results - getSearchResults`);
+      let response = await sendGetRequest(`${BASE_DOMAIN}/api/catalog/projects?number=16&page=0&order=views&genre=${tag.id}`, this.requestManager, `${BASE_DOMAIN}/catalog/comics/all`);
+      data = validateJSONResponse(response, `Retrieving search results - getSearchResults`);
     }
     // unsupported search requests
     else {
@@ -158,8 +162,8 @@ export class MangaDraft implements MangaProviding, ChapterProviding, SearchResul
   }
 
   private async loadSection(name: string, query: string, type: HomeSectionType): Promise<HomeSection> {
-    const response = await MD.sendGetRequest(`${BASE_DOMAIN}/api/catalog/projects?${query}`, this.requestManager, BASE_DOMAIN);
-    const data: HomePageResponse = MD.validateJSONResponse(response, `Retrieving ${name} section - getHomePageSections`);
+    const response = await sendGetRequest(`${BASE_DOMAIN}/api/catalog/projects?${query}`, this.requestManager, BASE_DOMAIN);
+    const data: HomePageResponse = validateJSONResponse(response, `Retrieving ${name} section - getHomePageSections`);
     // return the section
     return App.createHomeSection({
       id: name,
@@ -183,10 +187,52 @@ export class MangaDraft implements MangaProviding, ChapterProviding, SearchResul
    */
   private async loadSummaryData(mangaId: string, parentFunction: string): Promise<ProjectData> {
     // make the request
-    const request = await MD.sendGetRequest(`${BASE_DOMAIN}/manga/${mangaId}/summary`, this.requestManager);
+    const request = await sendGetRequest(`${BASE_DOMAIN}/manga/${mangaId}/summary`, this.requestManager);
     // check for errors
-    const data = MD.validateResponse(request, `Loading summary page of id "${mangaId}" - ${parentFunction}`);
+    const data = validateResponse(request, `Loading summary page of id "${mangaId}" - ${parentFunction}`);
     // find the project data
-    return MD.extractProjectData(data, `Loading summary page of id "${mangaId}" - ${parentFunction}`);
+    return extractProjectData(data, `Loading summary page of id "${mangaId}" - ${parentFunction}`);
+  }
+}
+
+/**
+ * Generates a tag section from the project's genres
+ * @param project The project
+ * @returns The tag section, and whether or not the project is NSFW
+ */
+function createProjectTagSection(project: ProjectData): [TagSection, boolean] {
+  // variables
+  var tags: Tag[] = [];
+  var isNSFW = false;
+  // create tag objects and check if this is NSFW
+  for(let genre of project.project.genres){
+    if(!isNSFW && genre.name.includes("XXX")){
+      isNSFW = true;
+    }
+    tags.push(App.createTag({id: genre.slug, label: genre.name}));
+  }
+  // create the tag section
+  const tagSection = App.createTagSection({id: "genre", label: "Genres", tags});
+  // return
+  return [tagSection, isNSFW];
+}
+
+/**
+ * Tries to extract the project data from the given response body
+ * @param body The response body
+ * @param purpose The purpose (for use in the error messages)
+ * @returns The project data, if found
+ */
+function extractProjectData(body: string, purpose: string): ProjectData {
+  // use regex to find JSON
+  const projectDataString = body.match(/(?<=window\.project_data ?= ?){[^\n]+(?=;)/);
+  if(projectDataString === null){
+    throw new Error(`Could not find "project_data" definition in page body [${purpose}]`);
+  }
+  // try to parse
+  try {
+    return JSON.parse(projectDataString[0]);
+  }catch(err){
+    throw new Error(`Body of "project_data" is not valid JSON - Please report if you see this [${purpose}]`);
   }
 }

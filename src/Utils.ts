@@ -1,47 +1,4 @@
-import {RequestManager, Response, Tag, TagSection} from "@paperback/types";
-import { ProjectData } from "./Types";
-
-/**
- * Generates a tag section from the project's genres
- * @param project The project
- * @returns The tag section, and whether or not the project is NSFW
- */
-export function createProjectTagSection(project: ProjectData): [TagSection, boolean] {
-  // variables
-  var tags: Tag[] = [];
-  var isNSFW = false;
-  // create tag objects and check if this is NSFW
-  for(let genre of project.project.genres){
-    if(!isNSFW && genre.name.includes("XXX")){
-      isNSFW = true;
-    }
-    tags.push(App.createTag({id: genre.slug, label: genre.name}));
-  }
-  // create the tag section
-  const tagSection = App.createTagSection({id: "genre", label: "Genres", tags});
-  // return
-  return [tagSection, isNSFW];
-}
-
-/**
- * Tries to extract the project data from the given response body
- * @param body The response body
- * @param purpose The purpose (for use in the error messages)
- * @returns The project data, if found
- */
-export function extractProjectData(body: string, purpose: string): ProjectData {
-  // use regex to find JSON
-  const projectDataString = body.match(/(?<=window\.project_data ?= ?){[^\n]+(?=;)/);
-  if(projectDataString === null){
-    throw new Error(`Could not find "project_data" definition in page body [${purpose}]`);
-  }
-  // try to parse
-  try {
-    return JSON.parse(projectDataString[0]);
-  }catch(err){
-    throw new Error(`Body of "project_data" is not valid JSON - Please report if you see this [${purpose}]`);
-  }
-}
+import { RequestManager, Response } from "@paperback/types";
 
 /**
  * Sends a GET request and receives a response
