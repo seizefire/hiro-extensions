@@ -509,14 +509,14 @@ var _Sources = (() => {
       "use strict";
       Object.defineProperty(exports, "__esModule", { value: true });
       exports.BadgeColor = void 0;
-      var BadgeColor;
-      (function(BadgeColor2) {
-        BadgeColor2["BLUE"] = "default";
-        BadgeColor2["GREEN"] = "success";
-        BadgeColor2["GREY"] = "info";
-        BadgeColor2["YELLOW"] = "warning";
-        BadgeColor2["RED"] = "danger";
-      })(BadgeColor = exports.BadgeColor || (exports.BadgeColor = {}));
+      var BadgeColor2;
+      (function(BadgeColor3) {
+        BadgeColor3["BLUE"] = "default";
+        BadgeColor3["GREEN"] = "success";
+        BadgeColor3["GREY"] = "info";
+        BadgeColor3["YELLOW"] = "warning";
+        BadgeColor3["RED"] = "danger";
+      })(BadgeColor2 = exports.BadgeColor || (exports.BadgeColor = {}));
     }
   });
 
@@ -749,30 +749,7 @@ var _Sources = (() => {
     "On Hiatus"
   ];
 
-  // src/MangaDraft/Utils.ts
-  function createProjectTagSection(project) {
-    var tags = [];
-    var isNSFW = false;
-    for (let genre of project.project.genres) {
-      if (!isNSFW && genre.name.includes("XXX")) {
-        isNSFW = true;
-      }
-      tags.push(App.createTag({ id: genre.slug, label: genre.name }));
-    }
-    const tagSection = App.createTagSection({ id: "genre", label: "Genres", tags });
-    return [tagSection, isNSFW];
-  }
-  function extractProjectData(body, purpose) {
-    const projectDataString = body.match(/(?<=window\.project_data ?= ?){[^\n]+(?=;)/);
-    if (projectDataString === null) {
-      throw new Error(`Could not find "project_data" definition in page body [${purpose}]`);
-    }
-    try {
-      return JSON.parse(projectDataString[0]);
-    } catch (err) {
-      throw new Error(`Body of "project_data" is not valid JSON - Please report if you see this [${purpose}]`);
-    }
-  }
+  // src/Utils.ts
   async function sendGetRequest(url, requestManager, referer = url) {
     const request = App.createRequest({
       url,
@@ -810,7 +787,7 @@ var _Sources = (() => {
   // src/MangaDraft/MangaDraft.ts
   var BASE_DOMAIN = "https://mangadraft.com";
   var MangaDraftInfo = {
-    version: "1.0.1",
+    version: "1.0.2",
     name: "MangaDraft",
     description: "Extension that pulls manga from MangaDraft.",
     author: "Seize",
@@ -818,7 +795,12 @@ var _Sources = (() => {
     icon: "icon.png",
     contentRating: import_types.ContentRating.EVERYONE,
     websiteBaseURL: BASE_DOMAIN,
-    sourceTags: [],
+    sourceTags: [
+      {
+        text: "French",
+        type: import_types.BadgeColor.GREY
+      }
+    ],
     intents: import_types.SourceIntents.MANGA_CHAPTERS | import_types.SourceIntents.HOMEPAGE_SECTIONS
   };
   var MangaDraft = class {
@@ -951,6 +933,29 @@ var _Sources = (() => {
       return extractProjectData(data, `Loading summary page of id "${mangaId}" - ${parentFunction}`);
     }
   };
+  function createProjectTagSection(project) {
+    var tags = [];
+    var isNSFW = false;
+    for (let genre of project.project.genres) {
+      if (!isNSFW && genre.name.includes("XXX")) {
+        isNSFW = true;
+      }
+      tags.push(App.createTag({ id: genre.slug, label: genre.name }));
+    }
+    const tagSection = App.createTagSection({ id: "genre", label: "Genres", tags });
+    return [tagSection, isNSFW];
+  }
+  function extractProjectData(body, purpose) {
+    const projectDataString = body.match(/(?<=window\.project_data ?= ?){[^\n]+(?=;)/);
+    if (projectDataString === null) {
+      throw new Error(`Could not find "project_data" definition in page body [${purpose}]`);
+    }
+    try {
+      return JSON.parse(projectDataString[0]);
+    } catch (err) {
+      throw new Error(`Body of "project_data" is not valid JSON - Please report if you see this [${purpose}]`);
+    }
+  }
   return __toCommonJS(MangaDraft_exports);
 })();
 this.Sources = _Sources; if (typeof exports === 'object' && typeof module !== 'undefined') {module.exports.Sources = this.Sources;}
